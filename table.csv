@@ -1,0 +1,10 @@
+game,RD,RA,BD,BA,score_red,score_blue,tension
+1,Rigel,Alnilam,Alcor,Polaris,,,8.4
+2,Alcor,Merak,Antares,Dubhe,,,166.3
+3,Sirio,Polaris,Alnitak,Alnilam,,,5.9
+4,Antares,Rigel,Polaris,Merak,,,35.1
+5,Alnitak,Alcor,Sirio,Rigel,,,3.6
+6,Alnilam,Dubhe,Merak,Alnitak,,,87.1
+7,Merak,Alnitak,Rigel,Sirio,,,55.6
+8,Polaris,Sirio,Dubhe,Antares,,,44.6
+9,Dubhe,Antares,Alnilam,Alcor,,,42.4

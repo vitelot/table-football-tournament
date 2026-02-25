@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biliardino — Tournament Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0d0f14;
+    --surface:   #141720;
+    --surface2:  #1c2030;
+    --border:    #2a2f45;
+    --accent:    #e8c14a;
+    --red:       #e84a4a;
+    --blue:      #4a8fe8;
+    --green:     #4ae8a0;
+    --text:      #dde3f0;
+    --muted:     #5a6278;
+    --gold:      #e8c14a;
+    --silver:    #b0bec5;
+    --bronze:    #cd7f32;
+    --shame:     #7c3535;
+
+    --rank1-bg:  #2a2410;
+    --rank2-bg:  #1a2025;
+    --rank3-bg:  #1f1a10;
+    --rankL-bg:  #1f1010;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--text); }
+  .header-actions { display: flex; gap: 10px; }
+
+  /* ── BUTTONS ── */
+  button {
+    cursor: pointer;
+    border: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    border-radius: 4px;
+    transition: all .15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0d0f14;
+    font-weight: 500;
+  }
+  .btn-primary:hover { background: #f0d060; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger {
+    background: transparent;
+    color: var(--red);
+    border: 1px solid var(--red);
+  }
+  .btn-danger:hover { background: var(--red); color: #fff; }
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+  /* ── LAYOUT ── */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    gap: 0;
+    min-height: calc(100vh - 65px);
+  }
+
+  /* ── LEFT PANEL — ranking ── */
+  .panel-ranking {
+    padding: 28px 32px;
+    border-right: 1px solid var(--border);
+  }
+  .panel-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+
+  /* ── RANKING TABLE ── */
+  .ranking-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .ranking-table th {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 8px 10px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+  }
+  .ranking-table th:first-child,
+  .ranking-table th:nth-child(2) { text-align: left; }
+  .ranking-table td {
+    padding: 11px 10px;
+    text-align: right;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(42,47,69,.5);
+    transition: background .15s;
+  }
+  .ranking-table td:first-child { text-align: left; font-size: 12px; color: var(--muted); }
+  .ranking-table td:nth-child(2) {
+    text-align: left;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .ranking-table tr { cursor: default; }
+  .ranking-table tr:hover td { background: rgba(255,255,255,.02); }
+
+  /* rank highlights */
+  tr.rank-1 td { background: var(--rank1-bg); }
+  tr.rank-2 td { background: var(--rank2-bg); }
+  tr.rank-3 td { background: var(--rank3-bg); }
+  tr.rank-last td { background: var(--rankL-bg); }
+  tr.rank-1 td:nth-child(2) { color: var(--gold); }
+  tr.rank-2 td:nth-child(2) { color: var(--silver); }
+  tr.rank-3 td:nth-child(2) { color: var(--bronze); }
+  tr.rank-last td:nth-child(2) { color: var(--red); opacity: .8; }
+
+  .rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    background: var(--surface2);
+  }
+  tr.rank-1 .rank-badge { background: var(--gold); color: #111; }
+  tr.rank-2 .rank-badge { background: var(--silver); color: #111; }
+  tr.rank-3 .rank-badge { background: var(--bronze); color: #111; }
+  tr.rank-last .rank-badge { background: var(--shame); color: #fff; }
+
+  .pts-val {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--accent);
+  }
+  .positive { color: var(--green); }
+  .negative { color: var(--red); }
+  .neutral  { color: var(--muted); }
+
+  /* ── RIGHT PANEL — sidebar ── */
+  .panel-sidebar {
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .sidebar-section {
+    padding: 24px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── RESULT INPUT ── */
+  .game-form { display: flex; flex-direction: column; gap: 14px; }
+
+  .form-row { display: flex; gap: 10px; align-items: center; }
+  .form-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .form-group { flex: 1; display: flex; flex-direction: column; }
+
+  select, input[type="number"], input[type="text"] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 9px 12px;
+    border-radius: 4px;
+    outline: none;
+    width: 100%;
+    transition: border-color .15s;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+  select option { background: var(--surface2); }
+
+  .vs-divider {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.2rem;
+    color: var(--muted);
+    padding-top: 18px;
+    text-align: center;
+    min-width: 24px;
+  }
+
+  .team-block {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--surface2);
+  }
+  .team-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 2px;
+  }
+  .team-label.red { color: var(--red); }
+  .team-label.blue { color: var(--blue); }
+
+  .score-row { display: flex; align-items: center; gap: 8px; }
+  .score-input {
+    width: 64px !important;
+    text-align: center;
+    font-size: 20px !important;
+    font-weight: 500;
+    padding: 6px 4px !important;
+  }
+
+  /* ── GAMES LOG ── */
+  .games-log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+  }
+  .log-header {
+    padding: 16px 28px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: var(--surface);
+    z-index: 10;
+  }
+  .game-entry {
+    padding: 12px 28px;
+    border-bottom: 1px solid rgba(42,47,69,.4);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    transition: background .15s;
+  }
+  .game-entry:hover { background: rgba(255,255,255,.02); }
+  .game-entry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .game-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .game-score {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+  }
+  .game-score .red { color: var(--red); }
+  .game-score .blue { color: var(--blue); }
+  .game-score .sep { color: var(--muted); margin: 0 4px; font-size: 1rem; }
+  .game-players {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+  .game-actions { display: flex; gap: 6px; }
+
+  /* ── MODAL ── */
+  .modal-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.75);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px;
+    width: 420px;
+    max-width: 95vw;
+  }
+  .modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: 28px; right: 28px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 12px 18px;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: .5px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all .3s;
+    z-index: 300;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { border-left-color: var(--red); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+    .panel-sidebar { border-right: none; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Biliardino <span>//</span> Tracker</div>
+  <div class="header-actions">
+    <button class="btn-danger" onclick="openResetModal()">Reset</button>
+    <button class="btn-primary" onclick="saveToFile()">↓ Save</button>
+  </div>
+</header>
+
+<main>
+  <!-- ── LEFT: RANKING ── -->
+  <section class="panel-ranking">
+    <div class="panel-title">Live Ranking</div>
+    <table class="ranking-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          <th title="Games played">GP</th>
+          <th title="Points">Pts</th>
+          <th title="Goals scored">GF</th>
+          <th title="Goals against">GA</th>
+          <th title="Goal difference">GD</th>
+        </tr>
+      </thead>
+      <tbody id="ranking-body">
+        <tr><td colspan="7" class="empty-state">No games recorded yet</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ── RIGHT: SIDEBAR ── -->
+  <aside class="panel-sidebar">
+
+    <!-- Player setup -->
+    <div class="sidebar-section" id="player-setup-section">
+      <div class="panel-title" style="margin-bottom:10px">Players
+        <span id="player-count-badge" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:8px;font-weight:normal"></span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <textarea id="player-paste" placeholder="Paste elos.csv or table.csv contents here..." rows="5"
+          style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+                 font-family:'DM Mono',monospace;font-size:12px;padding:8px 10px;border-radius:4px;
+                 resize:vertical;outline:none;line-height:1.5"></textarea>
+        <button class="btn-primary btn-sm" onclick="loadPastedPlayers()" style="margin-top:2px;white-space:nowrap">Load</button>
+      </div>
+      <div style="margin-top:6px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">
+        Paste elos.csv to load players, or table.csv to import the full schedule.
+      </div>
+    </div>
+
+    <!-- Input form -->
+    <div class="sidebar-section">
+      <div class="panel-title" style="margin-bottom:16px">Record Game</div>
+      <div class="game-form">
+
+        <!-- Red team -->
+        <div class="team-block">
+          <div class="team-label red">Red Team</div>
+          <div class="form-row">
+            <div class="form-group">
+              <div class="form-label">Defender</div>
+              <select id="red-att"><option value="">— select —</option></select>
+            </div>
+            <div class="form-group">
+              <div class="form-label">Attacker</div>
+              <select id="red-def"><option value="">— select —</option></select>
+            </div>
+          </div>
+          <div class="score-row">
+            <div class="form-label" style="min-width:50px">Score</div>
+            <input type="number" id="score-red" class="score-input" min="0" max="99" value="0">
+          </div>
+        </div>
+
+        <!-- Blue team -->
+        <div class="team-block">
+          <div class="team-label blue">Blue Team</div>
+          <div class="form-row">
+            <div class="form-group">
+              <div class="form-label">Defender</div>
+              <select id="blue-att"><option value="">— select —</option></select>
+            </div>
+            <div class="form-group">
+              <div class="form-label">Attacker</div>
+              <select id="blue-def"><option value="">— select —</option></select>
+            </div>
+          </div>
+          <div class="score-row">
+            <div class="form-label" style="min-width:50px">Score</div>
+            <input type="number" id="score-blue" class="score-input" min="0" max="99" value="0">
+          </div>
+        </div>
+
+        <button class="btn-primary" onclick="submitGame()">+ Add Result</button>
+      </div>
+    </div>
+
+    <!-- Games log -->
+    <div class="log-header">
+      <div class="panel-title" style="margin-bottom:0">Game Log</div>
+      <span id="game-count" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">0 games</span>
+    </div>
+    <div class="games-log" id="games-log">
+      <div class="empty-state">No games yet</div>
+    </div>
+
+  </aside>
+</main>
+
+<!-- Edit modal -->
+<div class="modal-backdrop" id="edit-modal">
+  <div class="modal">
+    <div class="modal-title">Edit Game</div>
+    <div class="game-form">
+      <div class="team-block">
+        <div class="team-label red">Red Team</div>
+        <div class="form-row">
+          <div class="form-group">
+            <div class="form-label">Defender</div>
+            <select id="e-red-att"><option value="">— select —</option></select>
+          </div>
+          <div class="form-group">
+            <div class="form-label">Attacker</div>
+            <select id="e-red-def"><option value="">— select —</option></select>
+          </div>
+        </div>
+        <div class="score-row">
+          <div class="form-label" style="min-width:50px">Score</div>
+          <input type="number" id="e-score-red" class="score-input" min="0" max="99" value="0">
+        </div>
+      </div>
+      <div class="team-block">
+        <div class="team-label blue">Blue Team</div>
+        <div class="form-row">
+          <div class="form-group">
+            <div class="form-label">Defender</div>
+            <select id="e-blue-att"><option value="">— select —</option></select>
+          </div>
+          <div class="form-group">
+            <div class="form-label">Attacker</div>
+            <select id="e-blue-def"><option value="">— select —</option></select>
+          </div>
+        </div>
+        <div class="score-row">
+          <div class="form-label" style="min-width:50px">Score</div>
+          <input type="number" id="e-score-blue" class="score-input" min="0" max="99" value="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset modal -->
+<div class="modal-backdrop" id="reset-modal">
+  <div class="modal">
+    <div class="modal-title" style="color:var(--red)">Reset All Data</div>
+    <p style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+      This will permanently delete all games and players.<br>
+      Type <span style="font-family:'DM Mono',monospace;color:var(--text);background:var(--surface2);padding:1px 6px;border-radius:3px">YES!</span> to confirm.
+    </p>
+    <input type="text" id="reset-confirm-input" placeholder="Type YES! here"
+      style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+             font-family:'DM Mono',monospace;font-size:14px;padding:10px 12px;border-radius:4px;outline:none;">
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeResetModal()">Cancel</button>
+      <button class="btn-danger" onclick="confirmReset()">Wipe Everything</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- file inputs created dynamically -->
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+
+let state = {
+  players: [],   // { name }
+  games: []      // { id, redAtt, redDef, blueAtt, blueDef, scoreRed, scoreBlue, ts }
+};
+
+let editingId = null;
+
+// ─── FILE PICKER HELPER ───────────────────────────────────────────────────────
+// Creates a fresh <input type=file> each call — the only reliable cross-browser approach.
+
+function pickFile(accept, onload) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = accept;
+  input.style.cssText = 'position:fixed;top:-100px;left:-100px;opacity:0;';
+  document.body.appendChild(input);
+  input.addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) { document.body.removeChild(input); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.body.removeChild(input);
+      onload(ev.target.result, file.name);
+    };
+    reader.readAsText(file);
+  });
+  setTimeout(() => input.click(), 10);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+
+function init() {
+  const saved = localStorage.getItem('biliardino-state');
+  if (saved) {
+    try { state = JSON.parse(saved); } catch(e) {}
+  }
+  if (!state.players) state.players = [];
+  if (!state.games)   state.games   = [];
+  populateSelects();
+  render();
+}
+
+// ─── PLAYERS ─────────────────────────────────────────────────────────────────
+
+function getPlayerNames() {
+  const names = new Set(state.players.map(p => p.name));
+  state.games.forEach(g => {
+    [g.redAtt, g.redDef, g.blueAtt, g.blueDef].forEach(p => p && names.add(p));
+  });
+  return [...names].sort();
+}
+
+function populateSelects() {
+  const names = getPlayerNames();
+  const ids = ['red-att','red-def','blue-att','blue-def','e-red-att','e-red-def','e-blue-att','e-blue-def'];
+  ids.forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— select —</option>' +
+      names.map(n => `<option value="${esc(n)}"${n===cur?' selected':''}>${esc(n)}</option>`).join('');
+  });
+}
+
+// ─── POINTS LOGIC ────────────────────────────────────────────────────────────
+
+function computePoints(scoreRed, scoreBlue) {
+  const diff = scoreRed - scoreBlue;
+  if (diff > 1)   return { redPts: 2, bluePts: 0 };
+  if (diff === 1) return { redPts: 2, bluePts: 1 };
+  if (diff === 0) return { redPts: 1, bluePts: 1 };
+  if (diff === -1) return { redPts: 1, bluePts: 2 };
+  return { redPts: 0, bluePts: 2 };
+}
+
+function computeRanking() {
+  const stats = {};
+  state.games.forEach(g => {
+    const players = [
+      { name: g.redAtt,  gf: g.scoreRed,  ga: g.scoreBlue },
+      { name: g.redDef,  gf: g.scoreRed,  ga: g.scoreBlue },
+      { name: g.blueAtt, gf: g.scoreBlue, ga: g.scoreRed  },
+      { name: g.blueDef, gf: g.scoreBlue, ga: g.scoreRed  },
+    ];
+    const { redPts, bluePts } = computePoints(g.scoreRed, g.scoreBlue);
+    players.forEach(({ name, gf, ga }, idx) => {
+      if (!name) return;
+      if (!stats[name]) stats[name] = { gp: 0, pts: 0, gf: 0, ga: 0 };
+      stats[name].gp++;
+      stats[name].gf += gf;
+      stats[name].ga += ga;
+      stats[name].pts += idx < 2 ? redPts : bluePts;
+    });
+  });
+  getPlayerNames().forEach(name => {
+    if (!stats[name]) stats[name] = { gp: 0, pts: 0, gf: 0, ga: 0 };
+  });
+  return Object.entries(stats)
+    .map(([name, s]) => ({ name, ...s, gd: s.gf - s.ga }))
+    .sort((a, b) =>
+      b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.name.localeCompare(b.name)
+    );
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+
+function render() {
+  renderRanking();
+  renderLog();
+  updatePlayerBadge();
+  persist();
+}
+
+function renderRanking() {
+  const ranking = computeRanking();
+  const tbody = document.getElementById('ranking-body');
+  if (ranking.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Load your elos.csv or add a game to get started</td></tr>';
+    return;
+  }
+  const last = ranking.length - 1;
+  tbody.innerHTML = ranking.map((r, i) => {
+    let rowClass = '';
+    if (i === 0) rowClass = 'rank-1';
+    else if (i === 1) rowClass = 'rank-2';
+    else if (i === 2) rowClass = 'rank-3';
+    else if (i === last-1 && last > 2) rowClass = 'rank-last';
+    const gdClass = r.gd > 0 ? 'positive' : r.gd < 0 ? 'negative' : 'neutral';
+    const gdStr   = r.gd > 0 ? '+' + r.gd : String(r.gd);
+    return `<tr class="${rowClass}">
+      <td><span class="rank-badge">${i+1}</span></td>
+      <td>${esc(r.name)}</td>
+      <td>${r.gp}</td>
+      <td><span class="pts-val">${r.pts}</span></td>
+      <td>${r.gf}</td>
+      <td>${r.ga}</td>
+      <td class="${gdClass}">${gdStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderLog() {
+  const log   = document.getElementById('games-log');
+  const count = document.getElementById('game-count');
+  count.textContent = state.games.length + ' game' + (state.games.length !== 1 ? 's' : '');
+  if (state.games.length === 0) {
+    log.innerHTML = '<div class="empty-state">No games yet</div>';
+    return;
+  }
+  log.innerHTML = [...state.games].reverse().map((g, ri) => {
+    const i = state.games.length - ri;
+    const { redPts, bluePts } = computePoints(g.scoreRed, g.scoreBlue);
+    const date = new Date(g.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    return `<div class="game-entry" data-id="${g.id}">
+      <div class="game-entry-header">
+        <span class="game-num">GAME ${i} &nbsp;&middot;&nbsp; ${date}</span>
+        <div class="game-actions">
+          <button class="btn-ghost btn-sm" onclick="openEdit('${g.id}')">edit</button>
+          <button class="btn-danger btn-sm" onclick="deleteGame('${g.id}')">del</button>
+        </div>
+      </div>
+      <div class="game-score">
+        <span class="red">${g.scoreRed}</span>
+        <span class="sep">&#8212;</span>
+        <span class="blue">${g.scoreBlue}</span>
+        <span style="font-size:.75rem;color:var(--muted);margin-left:10px;font-family:'DM Mono',monospace">[${redPts}&#8211;${bluePts} pts]</span>
+      </div>
+      <div class="game-players">
+        <span style="color:var(--red)">${esc(g.redAtt)} / ${esc(g.redDef)}</span>
+        <span style="color:var(--blue)">${esc(g.blueAtt)} / ${esc(g.blueDef)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── ADD GAME ────────────────────────────────────────────────────────────────
+
+function submitGame() {
+  const ra = document.getElementById('red-att').value;
+  const rd = document.getElementById('red-def').value;
+  const ba = document.getElementById('blue-att').value;
+  const bd = document.getElementById('blue-def').value;
+  const sr = parseInt(document.getElementById('score-red').value)  || 0;
+  const sb = parseInt(document.getElementById('score-blue').value) || 0;
+  if (!ra || !rd || !ba || !bd) return toast('Select all four players', true);
+  if (new Set([ra,rd,ba,bd]).size < 4) return toast('Each player must be unique in a game', true);
+  state.games.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    redAtt: ra, redDef: rd, blueAtt: ba, blueDef: bd,
+    scoreRed: sr, scoreBlue: sb, ts: Date.now()
+  });
+  document.getElementById('score-red').value  = 0;
+  document.getElementById('score-blue').value = 0;
+  render();
+  toast('Game recorded');
+}
+
+// ─── EDIT / DELETE ───────────────────────────────────────────────────────────
+
+function openEdit(id) {
+  const g = state.games.find(x => x.id === id);
+  if (!g) return;
+  editingId = id;
+  populateSelects();
+  document.getElementById('e-red-att').value   = g.redAtt;
+  document.getElementById('e-red-def').value   = g.redDef;
+  document.getElementById('e-blue-att').value  = g.blueAtt;
+  document.getElementById('e-blue-def').value  = g.blueDef;
+  document.getElementById('e-score-red').value  = g.scoreRed;
+  document.getElementById('e-score-blue').value = g.scoreBlue;
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeModal() {
+  editingId = null;
+  document.getElementById('edit-modal').classList.remove('open');
+}
+
+function saveEdit() {
+  const g = state.games.find(x => x.id === editingId);
+  if (!g) return closeModal();
+  const ra = document.getElementById('e-red-att').value;
+  const rd = document.getElementById('e-red-def').value;
+  const ba = document.getElementById('e-blue-att').value;
+  const bd = document.getElementById('e-blue-def').value;
+  const sr = parseInt(document.getElementById('e-score-red').value)  || 0;
+  const sb = parseInt(document.getElementById('e-score-blue').value) || 0;
+  if (!ra || !rd || !ba || !bd) return toast('Select all four players', true);
+  if (new Set([ra,rd,ba,bd]).size < 4) return toast('Each player must be unique', true);
+  g.redAtt = ra; g.redDef = rd; g.blueAtt = ba; g.blueDef = bd;
+  g.scoreRed = sr; g.scoreBlue = sb;
+  closeModal();
+  render();
+  toast('Game updated');
+}
+
+function deleteGame(id) {
+  state.games = state.games.filter(g => g.id !== id);
+  render();
+  toast('Game deleted');
+}
+
+// ─── CSV LOAD ────────────────────────────────────────────────────────────────
+
+function loadCSV() {
+  pickFile('.csv', function(text) {
+    try {
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) throw new Error('File appears empty');
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const nameIdx = headers.indexOf('name');
+      if (nameIdx === -1) throw new Error('No "name" column found');
+      const names = lines.slice(1)
+        .map(l => { const cols = l.split(','); return cols[nameIdx] ? cols[nameIdx].trim() : ''; })
+        .filter(n => n.length > 0);
+      if (names.length === 0) throw new Error('No player names found');
+      const existing = new Set(state.players.map(p => p.name));
+      let added = 0;
+      names.forEach(name => {
+        if (!existing.has(name)) { state.players.push({ name }); added++; }
+      });
+      populateSelects();
+      render();
+      toast('Loaded ' + added + ' player' + (added !== 1 ? 's' : '') + ' from CSV');
+    } catch(err) {
+      toast('CSV error: ' + err.message, true);
+    }
+  });
+}
+
+// ─── PASTE PLAYER LOAD ───────────────────────────────────────────────────────
+
+function loadPastedPlayers() {
+  const raw = document.getElementById('player-paste').value.trim();
+  if (!raw) return toast('Nothing to load', true);
+
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length === 0) return toast('No content found', true);
+
+  // Detect which CSV type was pasted by inspecting the header row
+  if (lines[0].indexOf(',') !== -1) {
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+    // table.csv: has "rd", "ra", "bd", "ba" columns
+    if (headers.indexOf('rd') !== -1 && headers.indexOf('ra') !== -1) {
+      return loadTableCSV(lines, headers);
+    }
+
+    // elos.csv: has "name" column
+    if (headers.indexOf('name') !== -1) {
+      return loadElosCSV(lines, headers);
+    }
+
+    return toast('Unrecognised CSV format', true);
+  }
+
+  // Plain list of names, one per line
+  const names = lines.filter(n => n.length > 0);
+  if (names.length === 0) return toast('No player names found', true);
+  addPlayers(names);
+}
+
+function addPlayers(names) {
+  const existing = new Set(state.players.map(p => p.name));
+  let added = 0;
+  names.forEach(function(name) {
+    if (!existing.has(name)) { state.players.push({ name: name }); added++; }
+  });
+  document.getElementById('player-paste').value = '';
+  updatePlayerBadge();
+  populateSelects();
+  render();
+  toast('Added ' + added + ' player' + (added !== 1 ? 's' : ''));
+}
+
+function loadElosCSV(lines, headers) {
+  const nameIdx = headers.indexOf('name');
+  const names = lines.slice(1)
+    .map(l => { const cols = l.split(','); return cols[nameIdx] ? cols[nameIdx].trim() : ''; })
+    .filter(n => n.length > 0);
+  if (names.length === 0) return toast('No player names found', true);
+  addPlayers(names);
+}
+
+function loadTableCSV(lines, headers) {
+  const rdIdx  = headers.indexOf('rd');
+  const raIdx  = headers.indexOf('ra');
+  const bdIdx  = headers.indexOf('bd');
+  const baIdx  = headers.indexOf('ba');
+  const srIdx  = headers.indexOf('score_red');
+  const sbIdx  = headers.indexOf('score_blue');
+
+  // Collect all player names first, add any new ones
+  const allNames = new Set();
+  lines.slice(1).forEach(function(l) {
+    const cols = l.split(',');
+    [rdIdx, raIdx, bdIdx, baIdx].forEach(function(idx) {
+      if (cols[idx] && cols[idx].trim()) allNames.add(cols[idx].trim());
+    });
+  });
+  const existing = new Set(state.players.map(p => p.name));
+  allNames.forEach(function(name) {
+    if (!existing.has(name)) state.players.push({ name: name });
+  });
+
+  // Insert games
+  let added = 0;
+  lines.slice(1).forEach(function(l) {
+    const cols = l.split(',');
+    const rd = cols[rdIdx] ? cols[rdIdx].trim() : '';
+    const ra = cols[raIdx] ? cols[raIdx].trim() : '';
+    const bd = cols[bdIdx] ? cols[bdIdx].trim() : '';
+    const ba = cols[baIdx] ? cols[baIdx].trim() : '';
+    if (!rd || !ra || !bd || !ba) return;
+    const sr = (srIdx !== -1 && cols[srIdx] && cols[srIdx].trim() !== '') ? parseInt(cols[srIdx]) : 0;
+    const sb = (sbIdx !== -1 && cols[sbIdx] && cols[sbIdx].trim() !== '') ? parseInt(cols[sbIdx]) : 0;
+    state.games.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6) + added,
+      redAtt: ra, redDef: rd, blueAtt: ba, blueDef: bd,
+      scoreRed: sr, scoreBlue: sb,
+      ts: Date.now() + added
+    });
+    added++;
+  });
+
+  document.getElementById('player-paste').value = '';
+  updatePlayerBadge();
+  populateSelects();
+  render();
+  toast('Imported ' + added + ' game' + (added !== 1 ? 's' : '') + ' from table.csv');
+}
+
+function updatePlayerBadge() {
+  const n = getPlayerNames().length;
+  const el = document.getElementById('player-count-badge');
+  if (el) el.textContent = n > 0 ? '(' + n + ' loaded)' : '';
+}
+
+// ─── CSV AUTO-LOAD ───────────────────────────────────────────────────────────
+
+
+
+
+
+// ─── SESSION SAVE / LOAD ──────────────────────────────────────────────────────
+
+function saveToFile() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  //a.download = 'biliardino-' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = 'biliardino-' + new Date().toISOString().slice(0,19).replace('T','_') + '.json';
+  a.click();
+  toast('Session saved');
+}
+
+
+
+// ─── RESET ───────────────────────────────────────────────────────────────────
+
+function openResetModal() {
+  document.getElementById('reset-confirm-input').value = '';
+  document.getElementById('reset-modal').classList.add('open');
+  setTimeout(function() { document.getElementById('reset-confirm-input').focus(); }, 50);
+}
+
+function closeResetModal() {
+  document.getElementById('reset-modal').classList.remove('open');
+}
+
+function confirmReset() {
+  var val = document.getElementById('reset-confirm-input').value.trim();
+  if (val !== 'YES!') {
+    document.getElementById('reset-confirm-input').style.borderColor = 'var(--red)';
+    setTimeout(function() {
+      document.getElementById('reset-confirm-input').style.borderColor = '';
+    }, 800);
+    return;
+  }
+  state = { players: [], games: [] };
+  localStorage.removeItem('biliardino-state');
+  closeResetModal();
+  populateSelects();
+  render();
+  toast('All data wiped');
+}
+
+// ─── PERSISTENCE ─────────────────────────────────────────────────────────────
+
+function persist() {
+  localStorage.setItem('biliardino-state', JSON.stringify(state));
+}
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+
+function esc(str) {
+  return String(str || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function toast(msg, isError) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { el.className = 'toast'; }, 2800);
+}
+
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+document.getElementById('reset-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeResetModal();
+});
+
+// ─── BOOTSTRAP ───────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

@@ -35,13 +35,14 @@ using DataFrames
 using Statistics
 using Random
 using Printf
+using ProgressMeter
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 const POSITIONS = ["RA", "RD", "BA", "BD"]
 const N_POS     = 4
-const N_ITER    = 100_000
+const N_ITER    = 1_000_000
 
 # ---------------------------------------------------------------------------
 # Elo objective helpers
@@ -248,38 +249,51 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    optimise(n_players, elos; n_iter) -> (best_schedule, best_score)
+    optimise(n_players, elos; n_iter) -> (best_schedule, best_score, all_scores)
 
 Run `n_iter` schedule generations across all available threads.
-Each thread keeps its own best; results are merged at the end.
+Each thread keeps its own best and accumulates all scores for statistics.
+Returns the best schedule, its score, and the full vector of all scores seen.
+Progress is displayed via ProgressMeter.jl.
 """
 function optimise(n_players::Int, elos::Vector{Float64}; n_iter::Int = N_ITER)
-    n_threads = Threads.nthreads()
+    n_threads       = Threads.nthreads()
     iter_per_thread = cld(n_iter, n_threads)
 
     thread_best_scores    = fill(Inf, n_threads)
     thread_best_schedules = Vector{Vector{Vector{Int}}}(undef, n_threads)
+    thread_all_scores     = [Float64[] for _ in 1:n_threads]
+
+    prog = Progress(n_iter; dt=0.2, barlen=40, color=:cyan,
+                    desc="  Optimising: ")
 
     Threads.@threads for t in 1:n_threads
-        rng = MersenneTwister(t * 31337)
-        local_best_score    = Inf
-        local_best_schedule = Vector{Vector{Int}}()
+        rng              = MersenneTwister(t * 31337)
+        local_best       = Inf
+        local_best_sched = Vector{Vector{Int}}()
+        local_scores     = Float64[]
+        sizehint!(local_scores, iter_per_thread)
 
         for _ in 1:iter_per_thread
             candidate = generate_schedule(n_players, rng)
             score     = schedule_score(candidate, elos)
-            if score < local_best_score
-                local_best_score    = score
-                local_best_schedule = deepcopy(candidate)
+            push!(local_scores, score)
+            if score < local_best
+                local_best       = score
+                local_best_sched = deepcopy(candidate)
             end
+            next!(prog)
         end
 
-        thread_best_scores[t]    = local_best_score
-        thread_best_schedules[t] = local_best_schedule
+        thread_best_scores[t]    = local_best
+        thread_best_schedules[t] = local_best_sched
+        thread_all_scores[t]     = local_scores
     end
 
-    best_idx = argmin(thread_best_scores)
-    return thread_best_schedules[best_idx], thread_best_scores[best_idx]
+    finish!(prog)
+    best_idx   = argmin(thread_best_scores)
+    all_scores = reduce(vcat, thread_all_scores)
+    return thread_best_schedules[best_idx], thread_best_scores[best_idx], all_scores
 end
 
 # ---------------------------------------------------------------------------
@@ -323,26 +337,27 @@ function print_schedule(schedule::Vector{Vector{Int}},
     println("="^width)
 
     header = lpad("Game", 6) * sep *
-             lpad("RA", col_w) * sep *
              lpad("RD", col_w) * sep *
-             lpad("BA", col_w) * sep *
+             lpad("RA", col_w) * sep *
              lpad("BD", col_w) * sep *
+             lpad("BA", col_w) * sep *
              rpad("Tension", 10)
     println(header)
     println("-"^width)
 
     total_tension = 0.0
     for (g, game) in enumerate(schedule)
-        pnames = [rpad(players.name[i], col_w) for i in game]
-        e      = Tuple(elos[i] for i in game)
-        t      = game_tension(e)
+        # game = [RA, RD, BA, BD] → print order: RD(2), RA(1), BD(4), BA(3)
+        rd = rpad(players.name[game[2]], col_w)
+        ra = rpad(players.name[game[1]], col_w)
+        bd = rpad(players.name[game[4]], col_w)
+        ba = rpad(players.name[game[3]], col_w)
+        e  = Tuple(elos[i] for i in game)
+        t  = game_tension(e)
         total_tension += t
 
         row = lpad(string(g), 6) * sep *
-              pnames[1] * sep *
-              pnames[2] * sep *
-              pnames[3] * sep *
-              pnames[4] * sep *
+              rd * sep * ra * sep * bd * sep * ba * sep *
               lpad(@sprintf("%.1f", t), 10)
         println(row)
     end
@@ -408,10 +423,14 @@ function main()
     println("Iterations       : $N_ITER\n")
 
     t_start = time()
-    best_schedule, _ = optimise(n_players, elos; n_iter = N_ITER)
+    best_schedule, best_score, all_scores = optimise(n_players, elos; n_iter = N_ITER)
     elapsed = time() - t_start
 
     @printf "Optimisation complete in %.1f seconds.\n" elapsed
+    @printf "  Best  (min) fairness score : %.2f\n"    best_score
+    @printf "  Worst (max) fairness score : %.2f\n"    maximum(all_scores)
+    @printf "  Median      fairness score : %.2f\n"    median(all_scores)
+    println()
 
     validate_schedule!(best_schedule, n_players)
     print_schedule(best_schedule, players, elos)

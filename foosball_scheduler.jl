@@ -18,6 +18,8 @@ Rules:
         RA (Red Attacker), RD (Red Defender),
         BA (Blue Attacker), BD (Blue Defender).
     With n players this yields exactly n games.
+    No unordered team pair may appear more than once across all games
+    (i.e. Dubhe-Alcor and Alcor-Dubhe are treated as the same team).
 
 Optimization:
     Runs 1,000,000 candidate schedules in parallel and selects the one
@@ -39,7 +41,7 @@ using Printf
 # ---------------------------------------------------------------------------
 const POSITIONS = ["RA", "RD", "BA", "BD"]
 const N_POS     = 4
-const N_ITER    = 1_000_000
+const N_ITER    = 100_000
 
 # ---------------------------------------------------------------------------
 # Elo objective helpers
@@ -65,11 +67,20 @@ end
 # ---------------------------------------------------------------------------
 
 """
+    team_key(a, b) -> Tuple{Int,Int}
+
+Canonical unordered pair for two player indices: always (min, max).
+Dubhe-Alcor and Alcor-Dubhe map to the same key.
+"""
+@inline team_key(a::Int, b::Int) = a < b ? (a, b) : (b, a)
+
+"""
     is_valid_schedule(schedule, n_players) -> Bool
 
 A schedule is valid when:
-  (a) every game has 4 distinct players, and
-  (b) each position column is a permutation of 1..n_players.
+  (a) every game has 4 distinct players,
+  (b) each position column is a permutation of 1..n_players, and
+  (c) no unordered team (Red or Blue) appears more than once across all games.
 """
 function is_valid_schedule(schedule::Vector{Vector{Int}}, n_players::Int)::Bool
     length(schedule) == n_players || return false
@@ -78,6 +89,16 @@ function is_valid_schedule(schedule::Vector{Vector{Int}}, n_players::Int)::Bool
     end
     for pos in 1:N_POS
         sort([game[pos] for game in schedule]) == collect(1:n_players) || return false
+    end
+    # Check team uniqueness: positions are [RA, RD, BA, BD]
+    seen_teams = Set{Tuple{Int,Int}}()
+    for game in schedule
+        red_key  = team_key(game[1], game[2])   # RA, RD
+        blue_key = team_key(game[3], game[4])   # BA, BD
+        red_key  in seen_teams && return false
+        blue_key in seen_teams && return false
+        push!(seen_teams, red_key)
+        push!(seen_teams, blue_key)
     end
     return true
 end
@@ -95,10 +116,14 @@ Algorithm:
        game are distinct. When game g has a duplicate in position p, we swap
        pools[p][g] with a randomly chosen slot j != g in the same pool,
        then re-sync games[j] to reflect the swap.
-    3. We iterate until all games are conflict-free or the retry cap is hit,
-       in which case we restart from fresh permutations.
-    4. The caller can retry generate_schedule until is_valid_schedule passes;
-       in practice a valid result is found on the first or second attempt.
+    3. We iterate until all games are conflict-free and team-unique, or the
+       retry cap is hit, in which case we restart from fresh permutations.
+    4. Team uniqueness (no repeated unordered pair across games) is checked
+       via a Set{Tuple{Int,Int}} of canonical (min,max) team keys. If a swap
+       resolves a player collision but creates a repeated team, the swap is
+       retried with a different partner.
+    5. The caller can retry generate_schedule until is_valid_schedule passes;
+       in practice a valid result is found quickly.
 """
 function generate_schedule(n_players::Int, rng::AbstractRNG)::Vector{Vector{Int}}
     max_restarts = 200
@@ -109,39 +134,86 @@ function generate_schedule(n_players::Int, rng::AbstractRNG)::Vector{Vector{Int}
         # Build games array directly from pools
         games = [[pools[p][g] for p in 1:N_POS] for g in 1:n_players]
 
-        # Fix duplicate-player conflicts game by game
+        # Fix duplicate-player AND duplicate-team conflicts game by game.
+        # seen_teams: canonical (min,max) pairs for all committed teams so far.
         changed = true
-        max_passes = n_players * 10
+        max_passes = n_players * 20
         pass = 0
         while changed && pass < max_passes
             changed = false
             pass += 1
-            for g in 1:n_players
-                length(unique(games[g])) == N_POS && continue
 
-                # Find a duplicated position in this game
-                seen = Dict{Int,Int}()
+            # Rebuild team registry from current games
+            seen_teams = Set{Tuple{Int,Int}}()
+            for game in games
+                push!(seen_teams, team_key(game[1], game[2]))   # Red: RA,RD
+                push!(seen_teams, team_key(game[3], game[4]))   # Blue: BA,BD
+            end
+
+            for g in 1:n_players
+                game = games[g]
+                has_dup_player = length(unique(game)) < N_POS
+                red_key  = team_key(game[1], game[2])
+                blue_key = team_key(game[3], game[4])
+                # Count how many games share this team (should be exactly 1: itself)
+                red_dup  = count(gg -> team_key(gg[1],gg[2]) == red_key,  games) > 1
+                blue_dup = count(gg -> team_key(gg[3],gg[4]) == blue_key, games) > 1
+                (has_dup_player || red_dup || blue_dup) || continue
+
+                # Determine which position to fix:
+                # prioritise player duplicates, then team duplicates
                 dup_pos = 0
-                for p in 1:N_POS
-                    pid = games[g][p]
-                    if haskey(seen, pid)
-                        dup_pos = p
-                        break
+                if has_dup_player
+                    seen_p = Dict{Int,Int}()
+                    for p in 1:N_POS
+                        pid = game[p]
+                        if haskey(seen_p, pid)
+                            dup_pos = p; break
+                        end
+                        seen_p[pid] = p
                     end
-                    seen[pid] = p
+                elseif red_dup
+                    dup_pos = rand(rng, 1:2)        # swap RA or RD
+                else
+                    dup_pos = rand(rng, 3:4)        # swap BA or BD
                 end
                 dup_pos == 0 && continue
 
-                # Pick a random swap partner (any other game slot)
-                j = rand(rng, 1:n_players-1)
-                j = j >= g ? j + 1 : j   # skip self
+                # Try random swap partners until one resolves the conflict
+                partners = shuffle(rng, [x for x in 1:n_players if x != g])
+                swapped = false
+                for j in partners
+                    # Tentative swap
+                    pools[dup_pos][g], pools[dup_pos][j] =
+                        pools[dup_pos][j], pools[dup_pos][g]
+                    new_g = [pools[p][g] for p in 1:N_POS]
+                    new_j = [pools[p][j] for p in 1:N_POS]
 
-                # Swap in the pool and re-sync both affected games
-                pools[dup_pos][g], pools[dup_pos][j] =
-                    pools[dup_pos][j], pools[dup_pos][g]
-                games[g][dup_pos] = pools[dup_pos][g]
-                games[j][dup_pos] = pools[dup_pos][j]
-                changed = true
+                    # Accept if game g is now free of player dups and team dups
+                    # (we do not re-validate j here — next pass will catch it)
+                    rk_g = team_key(new_g[1], new_g[2])
+                    bk_g = team_key(new_g[3], new_g[4])
+                    other_teams = Set{Tuple{Int,Int}}(
+                        vcat([team_key(games[x][1],games[x][2]) for x in 1:n_players if x!=g && x!=j],
+                             [team_key(games[x][3],games[x][4]) for x in 1:n_players if x!=g && x!=j])
+                    )
+                    ok = length(unique(new_g)) == N_POS &&
+                         !(rk_g in other_teams) &&
+                         !(bk_g in other_teams) &&
+                         rk_g != bk_g
+
+                    if ok
+                        games[g] = new_g
+                        games[j] = new_j
+                        swapped = true
+                        changed = true
+                        break
+                    else
+                        # Undo
+                        pools[dup_pos][g], pools[dup_pos][j] =
+                            pools[dup_pos][j], pools[dup_pos][g]
+                    end
+                end
             end
         end
 
@@ -222,7 +294,16 @@ function validate_schedule!(schedule::Vector{Vector{Int}}, n_players::Int)
     for (g, game) in enumerate(schedule)
         @assert length(unique(game)) == N_POS "Game $g has duplicate players: $game"
     end
-    println("  Validation passed: every player plays exactly once per position.")
+    seen_teams = Set{Tuple{Int,Int}}()
+    for (g, game) in enumerate(schedule)
+        rk = team_key(game[1], game[2])
+        bk = team_key(game[3], game[4])
+        @assert !(rk in seen_teams) "Game $g: Red team $(game[1])-$(game[2]) already appeared!"
+        @assert !(bk in seen_teams) "Game $g: Blue team $(game[3])-$(game[4]) already appeared!"
+        push!(seen_teams, rk)
+        push!(seen_teams, bk)
+    end
+    println("  Validation passed: all positions, players, and teams are unique.")
 end
 
 # ---------------------------------------------------------------------------
@@ -290,7 +371,7 @@ function save_table_csv(schedule::Vector{Vector{Int}},
     open(path, "w") do io
         println(io, "game,RD,RA,BD,BA,score_red,score_blue,tension")
         for (g, game) in enumerate(schedule)
-            ra, rd, ba, bd = [players.name[i] for i in game]
+            ra, rd, ba, bd = players.name[game[1]], players.name[game[2]], players.name[game[3]], players.name[game[4]]
             e = Tuple(elos[i] for i in game)
             t = game_tension(e)
             println(io, "$g,$rd,$ra,$bd,$ba,,,$(round(t; digits=1))")

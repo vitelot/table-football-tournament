@@ -389,6 +389,7 @@
   <div class="logo">Biliardino <span>//</span> Tracker</div>
   <div class="header-actions">
     <button class="btn-danger" onclick="openResetModal()">Reset</button>
+    <button class="btn-ghost" onclick="loadFromFile()">↑ Load</button>
     <button class="btn-primary" onclick="saveToFile()">↓ Save</button>
   </div>
 </header>
@@ -445,12 +446,12 @@
           <div class="team-label red">Red Team</div>
           <div class="form-row">
             <div class="form-group">
-              <div class="form-label">Defender</div>
-              <select id="red-att"><option value="">— select —</option></select>
+              <div class="form-label">RD — Defender</div>
+              <select id="red-def"><option value="">— select —</option></select>
             </div>
             <div class="form-group">
-              <div class="form-label">Attacker</div>
-              <select id="red-def"><option value="">— select —</option></select>
+              <div class="form-label">RA — Attacker</div>
+              <select id="red-att"><option value="">— select —</option></select>
             </div>
           </div>
           <div class="score-row">
@@ -464,12 +465,12 @@
           <div class="team-label blue">Blue Team</div>
           <div class="form-row">
             <div class="form-group">
-              <div class="form-label">Defender</div>
-              <select id="blue-att"><option value="">— select —</option></select>
+              <div class="form-label">BD — Defender</div>
+              <select id="blue-def"><option value="">— select —</option></select>
             </div>
             <div class="form-group">
-              <div class="form-label">Attacker</div>
-              <select id="blue-def"><option value="">— select —</option></select>
+              <div class="form-label">BA — Attacker</div>
+              <select id="blue-att"><option value="">— select —</option></select>
             </div>
           </div>
           <div class="score-row">
@@ -503,12 +504,12 @@
         <div class="team-label red">Red Team</div>
         <div class="form-row">
           <div class="form-group">
-            <div class="form-label">Defender</div>
-            <select id="e-red-att"><option value="">— select —</option></select>
+            <div class="form-label">RD — Defender</div>
+            <select id="e-red-def"><option value="">— select —</option></select>
           </div>
           <div class="form-group">
-            <div class="form-label">Attacker</div>
-            <select id="e-red-def"><option value="">— select —</option></select>
+            <div class="form-label">RA — Attacker</div>
+            <select id="e-red-att"><option value="">— select —</option></select>
           </div>
         </div>
         <div class="score-row">
@@ -520,12 +521,12 @@
         <div class="team-label blue">Blue Team</div>
         <div class="form-row">
           <div class="form-group">
-            <div class="form-label">Defender</div>
-            <select id="e-blue-att"><option value="">— select —</option></select>
+            <div class="form-label">BD — Defender</div>
+            <select id="e-blue-def"><option value="">— select —</option></select>
           </div>
           <div class="form-group">
-            <div class="form-label">Attacker</div>
-            <select id="e-blue-def"><option value="">— select —</option></select>
+            <div class="form-label">BA — Attacker</div>
+            <select id="e-blue-att"><option value="">— select —</option></select>
           </div>
         </div>
         <div class="score-row">
@@ -533,6 +534,12 @@
           <input type="number" id="e-score-blue" class="score-input" min="0" max="99" value="0">
         </div>
       </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <input type="checkbox" id="e-played" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;">
+      <label for="e-played" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);cursor:pointer;user-select:none">
+        Mark as played (required for 0–0 results)
+      </label>
     </div>
     <div class="modal-actions">
       <button class="btn-ghost" onclick="closeModal()">Cancel</button>
@@ -621,7 +628,7 @@ function getPlayerNames() {
 
 function populateSelects() {
   const names = getPlayerNames();
-  const ids = ['red-att','red-def','blue-att','blue-def','e-red-att','e-red-def','e-blue-att','e-blue-def'];
+  const ids = ['red-def','red-att','blue-def','blue-att','e-red-def','e-red-att','e-blue-def','e-blue-att'];
   ids.forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -645,6 +652,8 @@ function computePoints(scoreRed, scoreBlue) {
 function computeRanking() {
   const stats = {};
   state.games.forEach(g => {
+    // Skip 0-0 games that haven't been explicitly marked as played
+    if (g.scoreRed === 0 && g.scoreBlue === 0 && g.played !== true) return;
     const players = [
       { name: g.redAtt,  gf: g.scoreRed,  ga: g.scoreBlue },
       { name: g.redDef,  gf: g.scoreRed,  ga: g.scoreBlue },
@@ -716,13 +725,13 @@ function renderLog() {
     log.innerHTML = '<div class="empty-state">No games yet</div>';
     return;
   }
-  log.innerHTML = [...state.games].reverse().map((g, ri) => {
-    const i = state.games.length - ri;
+  log.innerHTML = [...state.games].map((g, i) => {
+    const i_num = i + 1;
     const { redPts, bluePts } = computePoints(g.scoreRed, g.scoreBlue);
     const date = new Date(g.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
     return `<div class="game-entry" data-id="${g.id}">
       <div class="game-entry-header">
-        <span class="game-num">GAME ${i} &nbsp;&middot;&nbsp; ${date}</span>
+        <span class="game-num">GAME ${i_num} &nbsp;&middot;&nbsp; ${date}</span>
         <div class="game-actions">
           <button class="btn-ghost btn-sm" onclick="openEdit('${g.id}')">edit</button>
           <button class="btn-danger btn-sm" onclick="deleteGame('${g.id}')">del</button>
@@ -732,11 +741,13 @@ function renderLog() {
         <span class="red">${g.scoreRed}</span>
         <span class="sep">&#8212;</span>
         <span class="blue">${g.scoreBlue}</span>
-        <span style="font-size:.75rem;color:var(--muted);margin-left:10px;font-family:'DM Mono',monospace">[${redPts}&#8211;${bluePts} pts]</span>
+        ${(g.scoreRed === 0 && g.scoreBlue === 0 && g.played !== true)
+          ? '<span style="font-size:.75rem;color:var(--muted);margin-left:10px;font-family:\'DM Mono\',monospace">[not played]</span>'
+          : '<span style="font-size:.75rem;color:var(--muted);margin-left:10px;font-family:\'DM Mono\',monospace">[' + redPts + '&#8211;' + bluePts + ' pts]</span>'}
       </div>
       <div class="game-players">
-        <span style="color:var(--red)">${esc(g.redAtt)} / ${esc(g.redDef)}</span>
-        <span style="color:var(--blue)">${esc(g.blueAtt)} / ${esc(g.blueDef)}</span>
+        <span style="color:var(--red)">${esc(g.redDef)} / ${esc(g.redAtt)}</span>
+        <span style="color:var(--blue)">${esc(g.blueDef)} / ${esc(g.blueAtt)}</span>
       </div>
     </div>`;
   }).join('');
@@ -777,6 +788,7 @@ function openEdit(id) {
   document.getElementById('e-blue-def').value  = g.blueDef;
   document.getElementById('e-score-red').value  = g.scoreRed;
   document.getElementById('e-score-blue').value = g.scoreBlue;
+  document.getElementById('e-played').checked   = g.played !== false;
   document.getElementById('edit-modal').classList.add('open');
 }
 
@@ -798,6 +810,7 @@ function saveEdit() {
   if (new Set([ra,rd,ba,bd]).size < 4) return toast('Each player must be unique', true);
   g.redAtt = ra; g.redDef = rd; g.blueAtt = ba; g.blueDef = bd;
   g.scoreRed = sr; g.scoreBlue = sb;
+  g.played = document.getElementById('e-played').checked;
   closeModal();
   render();
   toast('Game updated');
@@ -927,6 +940,7 @@ function loadTableCSV(lines, headers) {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2,6) + added,
       redAtt: ra, redDef: rd, blueAtt: ba, blueDef: bd,
       scoreRed: sr, scoreBlue: sb,
+      played: (sr !== 0 || sb !== 0),
       ts: Date.now() + added
     });
     added++;
@@ -992,6 +1006,24 @@ function confirmReset() {
   populateSelects();
   render();
   toast('All data wiped');
+}
+
+// ─── SESSION LOAD ────────────────────────────────────────────────────────────
+
+function loadFromFile() {
+  pickFile('.json', function(text) {
+    try {
+      const loaded = JSON.parse(text);
+      if (!loaded.games) throw new Error('Invalid format: missing games');
+      state = loaded;
+      if (!state.players) state.players = [];
+      populateSelects();
+      render();
+      toast('Session loaded');
+    } catch(err) {
+      toast('Could not load file: ' + err.message, true);
+    }
+  });
 }
 
 // ─── PERSISTENCE ─────────────────────────────────────────────────────────────
